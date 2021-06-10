@@ -11,31 +11,30 @@ import (
 )
 
 const (
-	reverseURL = "http://127.0.0.1:2003/base"
-	proxyURL   = "127.0.0.1:2002"
+	targetURL  = "http://127.0.0.1:8002/base"
+	reverseURL = ":8001"
 )
 
+// 代理服务器
 func main() {
-	URL, err := url.Parse(reverseURL)
+	URL, err := url.Parse(targetURL)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
-	proxyHandler := httputil.NewSingleHostReverseProxy(URL)
-	proxyHandler.ModifyResponse = func(resp *http.Response) error {
-		if resp.StatusCode == 200 {
-			oldPayload, err := ioutil.ReadAll(resp.Body)
+	proxy := httputil.NewSingleHostReverseProxy(URL)
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		if resp.StatusCode == http.StatusFound {
+			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				panic(err)
+				log.Fatalln(err)
 			}
-			// 追加内容
-			newPayload := []byte("StatusCode err: " + string(oldPayload))
+			newPayload := []byte("rewrite resp body: " + string(body))
 			resp.Body = ioutil.NopCloser(bytes.NewBuffer(newPayload))
-			size := int64(len(newPayload))
-			resp.ContentLength = size
-			resp.Header.Set("Content-Length", strconv.FormatInt(size, 10))
+			resp.ContentLength = int64(len(newPayload))
+			resp.Header.Set("Content-Length", strconv.Itoa(len(newPayload)))
 		}
 		return nil
 	}
-	log.Println("我是代理服务器：" + proxyURL)
-	log.Fatalln(http.ListenAndServe(proxyURL, proxyHandler))
+	log.Printf("代理服务器：%s\t", reverseURL)
+	log.Fatalln(http.ListenAndServe(reverseURL, proxy))
 }

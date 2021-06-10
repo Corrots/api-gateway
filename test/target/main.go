@@ -1,15 +1,26 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 )
 
+const (
+	addr = ":8002"
+)
+
+// 下游服务器
 func main() {
-	addr := ":2003"
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("我是被代理的下游服务器, "))
-		w.Write([]byte("请求都被代理到我这里来处理了->"))
-		w.Write([]byte(addr))
+		io.WriteString(w, fmt.Sprintf("X-Forwarded-For: %s\n", r.Header["X-Forwarded-For"]))
+		io.WriteString(w, fmt.Sprintf("X-Real-IP: %s\n", r.Header["X-Real-IP"]))
+		io.WriteString(w, fmt.Sprintf("RemoteAddr: %s\n", r.RemoteAddr))
+
+		//w.WriteHeader(http.StatusFound)
+		io.WriteString(w, "RequestURI: "+r.RequestURI)
+		io.WriteString(w, "\t下游服务器，请求都由我来处理: "+addr)
 	})
+
 	http.ListenAndServe(addr, nil)
 }
